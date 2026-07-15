@@ -1,4 +1,3 @@
-# taste-haven-ai-receptionist
 # 🍽️ Taste Haven — AI Voice Receptionist
 
 An AI phone receptionist for a restaurant that **answers calls, understands natural speech, checks real-time table availability, books reservations, and sends branded email confirmations — with no human involved.**
