@@ -1,0 +1,145 @@
+{
+  "name": "Taste Haven - Table Cleanup",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "f02bf1b5-d0c4-4d61-b302-93501a8db77e",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "lincolnadura97@gmail.com",
+          "mode": "list",
+          "cachedResultName": "lincolnadura97@gmail.com"
+        },
+        "returnAll": true,
+        "timeMin": "={{ $now.minus({ days: 30 }).toISO() }}",
+        "timeMax": "={{ $now.toISO() }}",
+        "options": {}
+      },
+      "id": "bc4dbc4f-4682-4605-bd44-d45754bcbe2f",
+      "name": "Get Past Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        0
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "5NhLEVyOM86Zru27",
+          "name": "Google Calendar OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst events = $input.all();\nconst out = [];\n\nfor (const item of events) {\n  const e = item.json;\n  if (!e || !e.id) continue;\n\n  // Only touch events created by the booking workflow\n  const summary = e.summary || \"\";\n  if (summary.indexOf(\"Reservation -\") !== 0) continue;\n\n  // Only delete reservations whose end time has already passed\n  const endStr = (e.end && (e.end.dateTime || e.end.date)) || null;\n  if (!endStr) continue;\n  const endTime = new Date(endStr);\n  if (isNaN(endTime.getTime())) continue;\n\n  if (endTime < now) {\n    out.push({ json: { eventId: e.id, summary: summary, end: endStr } });\n  }\n}\n\nreturn out;"
+      },
+      "id": "64f0d1d7-7d96-47ab-a829-9ab7805982d1",
+      "name": "Filter Ended Reservations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "calendar": {
+          "__rl": true,
+          "value": "lincolnadura97@gmail.com",
+          "mode": "list",
+          "cachedResultName": "lincolnadura97@gmail.com"
+        },
+        "eventId": "={{ $json.eventId }}",
+        "options": {
+          "sendUpdates": "none"
+        }
+      },
+      "id": "cc95b6cb-fb67-47b6-87f0-f5e067f86503",
+      "name": "Delete Ended Reservation",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        0
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "5NhLEVyOM86Zru27",
+          "name": "Google Calendar OAuth2 API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Get Past Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Past Events": {
+      "main": [
+        [
+          {
+            "node": "Filter Ended Reservations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Ended Reservations": {
+      "main": [
+        [
+          {
+            "node": "Delete Ended Reservation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "7051f90b-7fea-4d83-8e61-432a437ba6b4",
+  "meta": {
+    "instanceId": "62fa60f0ba0a23f34f6621ed26eaa0ce40450da9e6625dda9ee7cc030254aa3c"
+  },
+  "nodeGroups": [],
+  "id": "RX3PPXvnY8gm0uWi",
+  "tags": []
+}
