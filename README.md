@@ -126,7 +126,7 @@ These are the real problems solved during the build — the interesting part of 
 
 ## 🚀 Setup
 
-See **[docs/SETUP.md](docs/SETUP.md)** for full step-by-step instructions.
+See **[docs/SETUP.md](https://github.com/Fiercexontan/taste-haven-ai-receptionist/blob/main/docs/DEMO.md)** for full step-by-step instructions.
 
 Quick version:
 1. Import `workflow/taste-haven-booking.workflow.json` **and** `workflow/taste-haven-table-cleanup.workflow.json` into your n8n instance.
