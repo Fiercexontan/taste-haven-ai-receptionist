@@ -1,0 +1,680 @@
+{
+  "name": "Taste Haven - Booking Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "taste-haven-booking",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "b3d363ae-06d1-4102-b91d-e52f14673021",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        192
+      ],
+      "webhookId": "4685d548-262d-4d4b-8be2-4ffad0bab401"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "is-tool-call-check",
+              "leftValue": "={{ $json.body.message.type }}",
+              "rightValue": "tool-calls",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "6216d6a0-7224-4757-9b42-57d4347fee2d",
+      "name": "Is Tool Call",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        224,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const args = $input.first().json.body.message.toolCalls[0].function.arguments;\n\nconst rawDate = (args.date || \"\").toLowerCase().trim();\nconst rawTime = (args.time || \"\").toLowerCase().trim();\n\nconst now = new Date();\nconst days = [\"sunday\",\"monday\",\"tuesday\",\"wednesday\",\"thursday\",\"friday\",\"saturday\"];\nconst months = [\"january\",\"february\",\"march\",\"april\",\"may\",\"june\",\"july\",\"august\",\"september\",\"october\",\"november\",\"december\"];\n\nfunction getNextDay(dayName) {\n  const targetDay = days.indexOf(dayName);\n  const currentDay = now.getDay();\n  let diff = targetDay - currentDay;\n  if (diff <= 0) diff += 7;\n  const result = new Date(now);\n  result.setDate(now.getDate() + diff);\n  return result;\n}\n\nlet bookingDate = null;\n\nif (rawDate.includes(\"today\")) {\n  bookingDate = new Date(now);\n} else if (rawDate.includes(\"tomorrow\")) {\n  bookingDate = new Date(now);\n  bookingDate.setDate(now.getDate() + 1);\n} else {\n  const dayMatch = days.find(d => rawDate.includes(d));\n  if (dayMatch) {\n    bookingDate = getNextDay(dayMatch);\n  }\n}\n\nif (!bookingDate) {\n  const isoMatch = rawDate.match(/(\\d{4})-(\\d{2})-(\\d{2})/);\n  if (isoMatch) {\n    bookingDate = new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3]));\n  }\n}\n\nif (!bookingDate) {\n  const monthMatch = months.find(m => rawDate.includes(m));\n  if (monthMatch) {\n    const dayNumMatch = rawDate.match(/(\\d{1,2})/);\n    if (dayNumMatch) {\n      let year = now.getFullYear();\n      const monthIndex = months.indexOf(monthMatch);\n      const dayNum = parseInt(dayNumMatch[1]);\n      bookingDate = new Date(year, monthIndex, dayNum);\n      if (bookingDate < now) {\n        bookingDate = new Date(year + 1, monthIndex, dayNum);\n      }\n    }\n  }\n}\n\nif (!bookingDate) {\n  bookingDate = new Date(now);\n}\n\nconst yyyy = bookingDate.getFullYear();\nconst mm = String(bookingDate.getMonth() + 1).padStart(2, \"0\");\nconst dd = String(bookingDate.getDate()).padStart(2, \"0\");\nconst formattedDate = `${yyyy}-${mm}-${dd}`;\n\nlet hour = 12;\nlet minute = \"00\";\nconst timeMatch = rawTime.match(/(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)?/);\nif (timeMatch) {\n  hour = parseInt(timeMatch[1]);\n  minute = timeMatch[2] || \"00\";\n  const meridian = timeMatch[3];\n  if (meridian === \"pm\" && hour < 12) hour += 12;\n  if (meridian === \"am\" && hour === 12) hour = 0;\n}\nconst formattedTime = `${String(hour).padStart(2, \"0\")}:${minute}`;\n\nlet endHour = hour + 1;\nif (endHour > 23) endHour = 23;\nconst formattedEndTime = `${String(endHour).padStart(2, \"0\")}:${minute}`;\n\nfunction formatPhoneForWhatsApp(phone) {\n  let cleaned = (phone || \"\").replace(/[^\\d+]/g, \"\");\n  if (cleaned.startsWith(\"+\")) return cleaned;\n  if (cleaned.startsWith(\"0\")) return \"+234\" + cleaned.slice(1);\n  if (cleaned.startsWith(\"234\")) return \"+\" + cleaned;\n  return \"+234\" + cleaned;\n}\n\nconst whatsappPhone = formatPhoneForWhatsApp(args.phone);\n\n// Customer email collected by the Vapi agent (may be empty if not captured)\nconst rawEmail = (args.email || \"\").trim();\nconst emailValid = /^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(rawEmail);\nconst restaurantEmail = \"lincolnadura97@gmail.com\";\n\nreturn {\n  name: args.name,\n  phone: args.phone,\n  whatsappPhone: whatsappPhone,\n  email: rawEmail,\n  emailValid: emailValid,\n  emailTo: emailValid ? rawEmail : restaurantEmail,\n  party_size: args.party_size,\n  notes: args.notes || \"\",\n  date: formattedDate,\n  time: formattedTime,\n  startDateTime: `${formattedDate}T${formattedTime}:00`,\n  endDateTime: `${formattedDate}T${formattedEndTime}:00`\n};"
+      },
+      "id": "549e59af-e5e2-4be4-8e7d-b338af214539",
+      "name": "Code in JavaScript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "lincolnadura97@gmail.com",
+          "mode": "list",
+          "cachedResultName": "lincolnadura97@gmail.com"
+        },
+        "timeMin": "={{ $json.startDateTime }}",
+        "timeMax": "={{ $json.endDateTime }}",
+        "options": {}
+      },
+      "id": "e47eff8b-bee1-417d-9506-2bf0bd820ce7",
+      "name": "Get many events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        96
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "5NhLEVyOM86Zru27",
+          "name": "Google Calendar OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const booking = $('Code in JavaScript').first().json;\nconst existingEvents = $input.all();\n\nconst hasConflict = existingEvents.some(item => item.json && item.json.id);\n\nreturn {\n  isAvailable: !hasConflict,\n  name: booking.name,\n  phone: booking.phone,\n  whatsappPhone: booking.whatsappPhone,\n  email: booking.email,\n  emailValid: booking.emailValid,\n  emailTo: booking.emailTo,\n  party_size: booking.party_size,\n  notes: booking.notes,\n  date: booking.date,\n  time: booking.time,\n  startDateTime: booking.startDateTime,\n  endDateTime: booking.endDateTime\n};"
+      },
+      "id": "b431fdbe-6c79-4cac-bbc1-f793490d9c70",
+      "name": "Decide Availability",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "715e917c-d495-45e2-9376-a983064f82a9",
+              "leftValue": "={{ $json.isAvailable }}",
+              "rightValue": {},
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "71c5b52c-e30e-4df3-bfb4-6abbb0a3de88",
+              "leftValue": "",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9e0666df-e399-41ce-82c2-3c06eb677ed4",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1120,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "lincolnadura97@gmail.com",
+          "mode": "list",
+          "cachedResultName": "lincolnadura97@gmail.com"
+        },
+        "start": "={{ $('Code in JavaScript').item.json.startDateTime }}",
+        "end": "={{ $('Code in JavaScript').item.json.endDateTime }}",
+        "additionalFields": {
+          "description": "=Phone: {{ $('Code in JavaScript').item.json.phone }} | Email: {{ $('Code in JavaScript').item.json.email }} | Notes: {{ $('Code in JavaScript').item.json.notes }}",
+          "summary": "=Reservation - {{ $('Code in JavaScript').item.json.name }} ({{ $('Code in JavaScript').item.json.party_size }} guests)"
+        }
+      },
+      "id": "9d6d5dbd-c0c6-488e-9c2d-5d19a0e687c0",
+      "name": "Create an event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1344,
+        0
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "5NhLEVyOM86Zru27",
+          "name": "Google Calendar OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"results\": [\n    {\n      \"toolCallId\": \"{{ $('Webhook').first().json.body.message.toolCalls[0].id }}\",\n      \"result\": \"{{ 'Your table for ' + $('Code in JavaScript').item.json.name + ', ' + $('Code in JavaScript').item.json.party_size + ' guests, is booked for ' + $('Code in JavaScript').item.json.date + ' at ' + $('Code in JavaScript').item.json.time + '.' }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "0662e9a1-98e3-46a9-88e3-5efe01127d75",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1568,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Code in JavaScript').item.json.emailTo }}",
+        "subject": "=Reservation Confirmed at Taste Haven – {{ $('Code in JavaScript').item.json.date }} at {{ $('Code in JavaScript').item.json.time }}",
+        "message": "=<div style=\"font-family: Arial, Helvetica, sans-serif; color: #2b2b2b; max-width: 600px; margin: 0 auto; line-height: 1.6;\">\n  <div style=\"background-color: #7a1f1f; padding: 24px; text-align: center;\">\n    <h1 style=\"color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 1px;\">TASTE HAVEN</h1>\n    <p style=\"color: #f2d6d6; margin: 4px 0 0; font-size: 13px;\">Fine Dining &amp; Reservations</p>\n  </div>\n  <div style=\"padding: 28px 24px;\">\n    <p style=\"font-size: 16px;\">Dear {{ $('Code in JavaScript').item.json.name }},</p>\n    <p>Thank you for choosing <strong>Taste Haven</strong>. We are delighted to confirm your reservation. Please find your booking details below:</p>\n    <table style=\"width: 100%; border-collapse: collapse; margin: 20px 0;\">\n      <tr><td style=\"padding: 10px 12px; background-color: #f7f2f2; font-weight: bold; width: 40%; border-bottom: 1px solid #eee;\">Reservation Name</td><td style=\"padding: 10px 12px; border-bottom: 1px solid #eee;\">{{ $('Code in JavaScript').item.json.name }}</td></tr>\n      <tr><td style=\"padding: 10px 12px; background-color: #f7f2f2; font-weight: bold; border-bottom: 1px solid #eee;\">Date</td><td style=\"padding: 10px 12px; border-bottom: 1px solid #eee;\">{{ $('Code in JavaScript').item.json.date }}</td></tr>\n      <tr><td style=\"padding: 10px 12px; background-color: #f7f2f2; font-weight: bold; border-bottom: 1px solid #eee;\">Time</td><td style=\"padding: 10px 12px; border-bottom: 1px solid #eee;\">{{ $('Code in JavaScript').item.json.time }}</td></tr>\n      <tr><td style=\"padding: 10px 12px; background-color: #f7f2f2; font-weight: bold; border-bottom: 1px solid #eee;\">Party Size</td><td style=\"padding: 10px 12px; border-bottom: 1px solid #eee;\">{{ $('Code in JavaScript').item.json.party_size }} guest(s)</td></tr>\n    </table>\n    <p>If you need to make any changes to your reservation or have any special requests, simply reply to this email and our team will be glad to assist.</p>\n    <p>We look forward to welcoming you and providing an exceptional dining experience.</p>\n    <p style=\"margin-top: 28px;\">Warm regards,</p>\n    <p style=\"margin: 0; font-weight: bold; font-size: 15px;\">Taste Haven</p>\n    <p style=\"margin: 2px 0; color: #7a1f1f; font-size: 13px;\">Reservations Manager &middot; Owner, Taste Haven</p>\n    <p style=\"margin: 2px 0; font-size: 13px;\"><a href=\"mailto:lincolnadura97@gmail.com\" style=\"color: #7a1f1f;\">lincolnadura97@gmail.com</a></p>\n  </div>\n  <div style=\"background-color: #f7f2f2; padding: 16px 24px; text-align: center; font-size: 11px; color: #999;\">\n    <p style=\"margin: 0;\">This is an automated confirmation from Taste Haven. Please add us to your contacts so future messages reach your inbox.</p>\n  </div>\n</div>",
+        "options": {
+          "appendAttribution": false,
+          "bccList": "lincolnadura97@gmail.com",
+          "senderName": "Taste Haven"
+        }
+      },
+      "id": "7bc7335d-0b51-48f7-89f2-ca79e9c142a8",
+      "name": "Send Confirmation Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1792,
+        0
+      ],
+      "webhookId": "d7f3934d-e571-475e-922d-8a34ab1b88a9",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "uwtBwZHsPJT3Xvrj",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "from": "+14155238886",
+        "to": "={{ $('Code in JavaScript').item.json.whatsappPhone }}",
+        "toWhatsapp": true,
+        "message": "=Hi {{ $('Code in JavaScript').item.json.name }}, your table for {{ $('Code in JavaScript').item.json.party_size }} at Taste Haven is confirmed for {{ $('Code in JavaScript').item.json.date }} at {{ $('Code in JavaScript').item.json.time }}. See you soon!",
+        "options": {}
+      },
+      "id": "2a7d3ad3-a8de-4e42-b551-0a6b9cbe95f1",
+      "name": "Send an SMS/MMS/WhatsApp message",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        2016,
+        0
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "96jH8cBv45mgIZux",
+          "name": "Twilio account"
+        }
+      },
+      "disabled": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1vbF9INhVDDJNLkrxnHTLNZo88HhYO-2PCCswJUeSBrE",
+          "mode": "list",
+          "cachedResultName": "Taste Haven Reservation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1vbF9INhVDDJNLkrxnHTLNZo88HhYO-2PCCswJUeSBrE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1vbF9INhVDDJNLkrxnHTLNZo88HhYO-2PCCswJUeSBrE/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.setZone(\"Africa/Lagos\").toFormat(\"yyyy-MM-dd HH:mm:ss\") }}",
+            "Name": "={{ $('Code in JavaScript').item.json.name }}",
+            "Phone": "={{ $('Code in JavaScript').item.json.phone }}",
+            "Email": "={{ $('Code in JavaScript').item.json.email }}",
+            "Party Size": "={{ $('Code in JavaScript').item.json.party_size }}",
+            "Date": "={{ $('Code in JavaScript').item.json.date }}",
+            "Time": "={{ $('Code in JavaScript').item.json.time }}",
+            "Outcome": "Booked"
+          },
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Party Size",
+              "displayName": "Party Size",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Time",
+              "displayName": "Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Outcome",
+              "displayName": "Outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "63e8cc48-186b-4069-86d4-e4cbabb902e2",
+      "name": "Log Booked Call",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2240,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wBH0Zf7UbIXhzRXB",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"results\": [\n    {\n      \"toolCallId\": \"{{ $('Webhook').first().json.body.message.toolCalls[0].id }}\",\n      \"result\": \"I'm sorry, that time slot is already booked. Could I offer you a different time, or would you like me to check another day?\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "aab03375-d762-4e86-956f-84a32a448cfb",
+      "name": "Respond to Webhook1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1344,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1vbF9INhVDDJNLkrxnHTLNZo88HhYO-2PCCswJUeSBrE",
+          "mode": "list",
+          "cachedResultName": "Taste Haven Reservation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1vbF9INhVDDJNLkrxnHTLNZo88HhYO-2PCCswJUeSBrE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1vbF9INhVDDJNLkrxnHTLNZo88HhYO-2PCCswJUeSBrE/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.setZone(\"Africa/Lagos\").toFormat(\"yyyy-MM-dd HH:mm:ss\") }}",
+            "Name": "={{ $('Code in JavaScript').item.json.name }}",
+            "Phone": "={{ $('Code in JavaScript').item.json.phone }}",
+            "Email": "={{ $('Code in JavaScript').item.json.email }}",
+            "Party Size": "={{ $('Code in JavaScript').item.json.party_size }}",
+            "Date": "={{ $('Code in JavaScript').item.json.date }}",
+            "Time": "={{ $('Code in JavaScript').item.json.time }}",
+            "Outcome": "Declined - Slot Unavailable"
+          },
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Party Size",
+              "displayName": "Party Size",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Time",
+              "displayName": "Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Outcome",
+              "displayName": "Outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bf3036ec-dc31-4c6e-8795-5c449f9f19c1",
+      "name": "Log Declined Call",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1568,
+        192
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wBH0Zf7UbIXhzRXB",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"ignored\" }",
+        "options": {}
+      },
+      "id": "72082ee5-11b8-4b94-a075-89e560ad503f",
+      "name": "Acknowledge Non-Tool Event",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        448,
+        288
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Is Tool Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Tool Call": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Acknowledge Non-Tool Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Get many events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many events": {
+      "main": [
+        [
+          {
+            "node": "Decide Availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide Availability": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Create an event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an event": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Confirmation Email": {
+      "main": [
+        [
+          {
+            "node": "Send an SMS/MMS/WhatsApp message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send an SMS/MMS/WhatsApp message": {
+      "main": [
+        [
+          {
+            "node": "Log Booked Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Log Declined Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "f3dc476f-b304-4173-8001-b18ed8dbfdc1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "62fa60f0ba0a23f34f6621ed26eaa0ce40450da9e6625dda9ee7cc030254aa3c"
+  },
+  "nodeGroups": [],
+  "id": "4qs2DBHS2PU61omH",
+  "tags": []
+}
